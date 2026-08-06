@@ -181,8 +181,8 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton(
-                "📧 ارسال ایمیل",
-                url="mailto:armantakestani6440@gmail.com",
+                "📧 ارسال ایمیل با Gmail",
+                url="https://mail.google.com/mail/?view=cm&fs=1&to=armantakestani6440@gmail.com",
             )
         ],
         [
@@ -198,7 +198,6 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact_text = """
 📬 راه‌های ارتباطی با آرمان
 
-
 📞 Phone:
 09100379179
 
@@ -210,12 +209,15 @@ armantakestani6440@gmail.com
 
 📸 Instagram:
 @armawni
+
+📨 درخواست ارتباط با آرمان
 """
 
     await update.message.reply_text(
         contact_text,
         reply_markup=reply_markup,
     )
+
 
 
 
