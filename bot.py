@@ -210,7 +210,7 @@ armantakestani6440@gmail.com
 📸 Instagram:
 @armawni
 
-📨 درخواست ارتباط با آرمان
+
 """
 
     await update.message.reply_text(
