@@ -159,7 +159,6 @@ async def ask_gapgpt(user_message: str) -> str:
 async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
-    # به ادمین خبر می‌ده که کاربر صفحه تماس را باز کرده
     await notify_admin(
         context=context,
         user=user,
@@ -182,6 +181,12 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton(
+                "📧 ارسال ایمیل",
+                url="mailto:armantakestani6440@gmail.com",
+            )
+        ],
+        [
+            InlineKeyboardButton(
                 "📸 اینستاگرام آرمان",
                 url="https://instagram.com/armawni",
             )
@@ -193,13 +198,15 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact_text = """
 📬 راه‌های ارتباطی با آرمان
 
-راه‌های مستقیم ارتباط:
 
 📞 Phone:
 09100379179
 
+📧 Gmail:
+armantakestani6440@gmail.com
+
 💬 Telegram:
-@ArmanTakestani
+@armawni
 
 📸 Instagram:
 @armawni
@@ -209,6 +216,7 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         contact_text,
         reply_markup=reply_markup,
     )
+
 
 
 
