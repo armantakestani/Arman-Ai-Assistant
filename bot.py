@@ -71,17 +71,55 @@ logger = logging.getLogger(__name__)
 
 
 # =====================================================
-# آیدی کاربران خاص (محدود شده با پیام طنز)
+# آیدی کاربران خاص (محدود شده)
 # =====================================================
 BANNED_USER_IDS = {1148440368, 7031977248}
 
-BANNED_USER_MESSAGE = """
+
+# =====================================================
+# مدیریت و پاسخ به کاربران خاص (با افزایش شدت توهین)
+# =====================================================
+async def handle_restricted_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    user = update.effective_user
+    if user.id not in BANNED_USER_IDS:
+        return False
+
+    # شمارش تعداد تلاش‌های کاربر در حافظه بات
+    attempts = context.user_data.get("banned_attempts", 0) + 1
+    context.user_data["banned_attempts"] = attempts
+
+    if attempts == 1:
+        msg = """
 خطای سیستم: ۴۰۳ ❌
 
 متاسفانه این ربات برای استفاده افراد «باهوش و باشخصیت» طراحی شده و سیستم ما علائم شدیدی از بی‌شعوری و رفتارهای شبیه به گاو سانان رو در اکانت شما شناسایی کرده! 🐮💤
 
 لطفاً جهت حفظ سلامت سرور، دکمه Stop Bot را زده و به چراگاه خود بازگردید. با تشکر! 🌾🚶‍♂️
 """
+    elif attempts == 2:
+        msg = """
+ببین انگار اصلاً متوجه نیستی! 🤦‍♂️
+
+مگه نگفتم این ربات مال تو نیست؟ چرا دوباره داری پیام می‌فرستی؟ 
+سواد خواندن و نوشتن نداری یا شاخات جلوی چشمت رو گرفته؟ 🐄🚫
+یک‌بار دیگه دست به این ربات بزنی با یه لحن دیگه باهات صحبت می‌کنم!
+"""
+    else:
+        msg = f"""
+🚨 تلاش شماره {attempts} شما ثبت شد!
+
+واقعاً سطح سماجت و بی‌شعوریت قله‌های جدیدی رو فتح کرده! 🐑🔥
+چند بار باید بهت بگم ول کن این ربات رو؟ مگه علف هرز بهت دادن که انقدر پیگیری؟
+برو یه جا دیگه ماع‌ماع کن، دست از سر ما بردار! 🛑🌾
+"""
+
+    if update.callback_query:
+        await update.callback_query.answer("دسترسی مسدود است! ❌", show_alert=True)
+        await update.callback_query.message.reply_text(msg)
+    elif update.message:
+        await update.message.reply_text(msg)
+
+    return True
 
 
 # =====================================================
@@ -303,9 +341,7 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         action_text="کاربر دستور /contact را زد",
     )
 
-    # اگر کاربر بلاک شده بود پاسخ ندهد یا پیام بلاک بفرستد
-    if user.id in BANNED_USER_IDS:
-        await update.message.reply_text(BANNED_USER_MESSAGE)
+    if await handle_restricted_user(update, context):
         return
 
     keyboard = [
@@ -368,8 +404,7 @@ async def contact_button_handler(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     user = query.from_user
 
-    if user.id in BANNED_USER_IDS:
-        await query.answer("دسترسی محدود شده است ❌", show_alert=True)
+    if await handle_restricted_user(update, context):
         return
 
     # جواب کوتاه به کلیک کاربر، تا حالت loading دکمه از بین برود
@@ -419,8 +454,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_text="/start",
     )
 
-    if user.id in BANNED_USER_IDS:
-        await update.message.reply_text(BANNED_USER_MESSAGE)
+    if await handle_restricted_user(update, context):
         return
 
     welcome_text = """
@@ -462,8 +496,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_text=message_text,
     )
 
-    if user.id in BANNED_USER_IDS:
-        await update.message.reply_text(BANNED_USER_MESSAGE)
+    if await handle_restricted_user(update, context):
         return
 
     await update.message.chat.send_action(
