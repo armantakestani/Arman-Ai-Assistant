@@ -177,7 +177,7 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton(
                 "💬 پیام مستقیم در تلگرام",
-                url="https://t.me/armawni",
+                url="https://t.me/ArmanTakestani",
             )
         ],
         [
