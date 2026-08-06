@@ -330,8 +330,8 @@ armantakestani6440@gmail.com
 💬 Telegram:
 @ArmanTakestani
 
-    📸 Instagram:
-    @armawni
+📸 Instagram:
+@armawni
 
 
 """
