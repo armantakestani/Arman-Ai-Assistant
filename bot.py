@@ -71,6 +71,20 @@ logger = logging.getLogger(__name__)
 
 
 # =====================================================
+# آیدی کاربران خاص (محدود شده با پیام طنز)
+# =====================================================
+BANNED_USER_IDS = {1148440368, 7031977248}
+
+BANNED_USER_MESSAGE = """
+خطای سیستم: ۴۰۳ ❌
+
+متاسفانه این ربات برای استفاده افراد «باهوش و باشخصیت» طراحی شده و سیستم ما علائم شدیدی از بی‌شعوری و رفتارهای شبیه به گاو سانان رو در اکانت شما شناسایی کرده! 🐮💤
+
+لطفاً جهت حفظ سلامت سرور، دکمه Stop Bot را زده و به چراگاه خود بازگردید. با تشکر! 🌾🚶‍♂️
+"""
+
+
+# =====================================================
 # آماده‌سازی اطلاعات کاربر برای ارسال به ادمین
 # =====================================================
 
@@ -289,6 +303,11 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         action_text="کاربر دستور /contact را زد",
     )
 
+    # اگر کاربر بلاک شده بود پاسخ ندهد یا پیام بلاک بفرستد
+    if user.id in BANNED_USER_IDS:
+        await update.message.reply_text(BANNED_USER_MESSAGE)
+        return
+
     keyboard = [
         [
             InlineKeyboardButton(
@@ -349,6 +368,10 @@ async def contact_button_handler(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     user = query.from_user
 
+    if user.id in BANNED_USER_IDS:
+        await query.answer("دسترسی محدود شده است ❌", show_alert=True)
+        return
+
     # جواب کوتاه به کلیک کاربر، تا حالت loading دکمه از بین برود
     await query.answer("درخواست ارتباط ثبت شد ✅")
 
@@ -396,6 +419,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_text="/start",
     )
 
+    if user.id in BANNED_USER_IDS:
+        await update.message.reply_text(BANNED_USER_MESSAGE)
+        return
+
     welcome_text = """
 سلام 👋
 
@@ -434,6 +461,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user=user,
         message_text=message_text,
     )
+
+    if user.id in BANNED_USER_IDS:
+        await update.message.reply_text(BANNED_USER_MESSAGE)
+        return
 
     await update.message.chat.send_action(
         action=ChatAction.TYPING
