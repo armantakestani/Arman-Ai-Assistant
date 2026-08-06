@@ -1,5 +1,10 @@
 import os
 import logging
+
+import aiohttp
+import re
+
+
 from datetime import datetime
 
 from openai import AsyncOpenAI
@@ -24,7 +29,16 @@ from telegram.ext import (
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GAPGPT_API_KEY = os.environ.get("GAPGPT_API_KEY")
 ADMIN_TELEGRAM_ID = int(os.environ.get("ADMIN_TELEGRAM_ID", "0"))
+# =====================================================
+# BRS API
+# =====================================================
 
+BRS_API_KEY = "BGvKeQy8FNfxRAYnafpDzNzLMxdEBeCs"
+
+BRS_API_URL = (
+    f"https://Api.BrsApi.ir/Market/Gold_Currency_Pro.php"
+    f"?key={BRS_API_KEY}"
+)
 
 # =====================================================
 # تنظیمات GapGPT
@@ -152,6 +166,115 @@ async def ask_gapgpt(user_message: str) -> str:
         )
 
 
+
+async def get_market_data():
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(BRS_API_URL) as response:
+
+            if response.status != 200:
+                return None
+
+            return await response.json()
+        
+        
+def find_symbol(data, keyword):
+
+    keyword = keyword.lower()
+
+    all_items = []
+
+    all_items.extend(data.get("gold", []))
+    all_items.extend(data.get("currency", []))
+    all_items.extend(data.get("cryptocurrency", []))
+
+    mapping = {
+        "دلار": "USD",
+        "تتر": "USDT_IRT",
+        "بیت": "BTC",
+        "بیت کوین": "BTC",
+        "بیتکوین": "BTC",
+        "اتریوم": "ETH",
+        "یورو": "EUR",
+        "پوند": "GBP",
+        "درهم": "AED",
+        "طلا": "IR_GOLD_18K",
+        "طلای 18": "IR_GOLD_18K",
+        "طلای 24": "IR_GOLD_24K",
+        "انس": "XAUUSD",
+        "سکه": "IR_COIN_EMAMI",
+        "ربع": "IR_COIN_QUARTER",
+        "نیم": "IR_COIN_HALF",
+        "بهار": "IR_COIN_BAHAR",
+    }
+
+    target_symbol = None
+
+    for k, v in mapping.items():
+        if k in keyword:
+            target_symbol = v
+            break
+
+    if not target_symbol:
+        return None
+
+    for item in all_items:
+        if item["symbol"] == target_symbol:
+            return item
+
+    return None
+
+
+
+
+def build_market_message(item):
+
+    change = item.get("change_percent", 0)
+
+    if change > 0:
+        emoji = "🟢"
+    elif change < 0:
+        emoji = "🔴"
+    else:
+        emoji = "⚪"
+
+    text = (
+        f"{emoji} {item['name']}\n\n"
+        f"💰 قیمت: {item['price']:,} {item['unit']}\n"
+        f"📈 تغییر: {item.get('change_percent',0)}%\n"
+        f"📊 مقدار تغییر: {item.get('change_value','-')}\n"
+        f"🕒 {item['date']} - {item['time']}"
+    )
+
+    return text
+
+
+
+def is_market_question(text):
+
+    keywords = [
+        "قیمت",
+        "نرخ",
+        "چنده",
+        "چند",
+        "طلا",
+        "سکه",
+        "دلار",
+        "یورو",
+        "تتر",
+        "بیت",
+        "بیت کوین",
+        "اتریوم",
+        "رمزارز",
+        "ارز"
+    ]
+
+    text = text.lower()
+
+    return any(k in text for k in keywords)
+
+
+
 # =====================================================
 # دستور /contact
 # =====================================================
@@ -207,8 +330,8 @@ armantakestani6440@gmail.com
 💬 Telegram:
 @ArmanTakestani
 
-📸 Instagram:
-@armawni
+    📸 Instagram:
+    @armawni
 
 
 """
@@ -302,6 +425,7 @@ async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =====================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user = update.effective_user
     message_text = update.message.text
 
@@ -311,7 +435,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_text=message_text,
     )
 
-    await update.message.chat.send_action(action=ChatAction.TYPING)
+    await update.message.chat.send_action(
+        action=ChatAction.TYPING
+    )
+
+    if is_market_question(message_text):
+
+        try:
+
+            data = await get_market_data()
+
+            if data:
+
+                item = find_symbol(data, message_text)
+
+                if item:
+
+                    await update.message.reply_text(
+                        build_market_message(item)
+                    )
+
+                    return
+
+        except Exception:
+            logger.exception("Market API Error")
 
     answer = await ask_gapgpt(message_text)
 
