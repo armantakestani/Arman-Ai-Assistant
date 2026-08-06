@@ -70,29 +70,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# =====================================================
-# آیدی کاربران خاص (محدود شده)
-# =====================================================
-BANNED_USER_IDS = {1148440368, 7031977248}
+BANNED_USER_TITLES = {
+    1148440368: "ثنای عزیز",
+    7031977248: "آرمان عزیز",
+}
 
-
-# =====================================================
-# مدیریت و پاسخ به کاربران خاص (با افزایش شدت توهین)
-# =====================================================
 async def handle_restricted_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     user = update.effective_user
-    if user.id not in BANNED_USER_IDS:
+    if user.id not in BANNED_USER_TITLES:
         return False
 
-    # شمارش تعداد تلاش‌های کاربر در حافظه بات
+    first_message_name = BANNED_USER_TITLES[user.id]
+
     attempts = context.user_data.get("banned_attempts", 0) + 1
     context.user_data["banned_attempts"] = attempts
 
     if attempts == 1:
-        msg = """
+        msg = f"""
 خطای سیستم: ۴۰۳ ❌
 
-متاسفانه این ربات برای استفاده افراد «باهوش و باشخصیت» طراحی شده و سیستم ما علائم شدیدی از بی‌شعوری و رفتارهای شبیه به گاو سانان رو در اکانت شما شناسایی کرده! 🐮💤
+{first_message_name} متاسفانه این ربات برای استفاده افراد «باهوش و باشخصیت» طراحی شده و سیستم ما علائم شدیدی از بی‌شعوری و رفتارهای شبیه به گاو سانان رو در اکانت شما شناسایی کرده! 🐮💤
 
 لطفاً جهت حفظ سلامت سرور، دکمه Stop Bot را زده و به چراگاه خود بازگردید. با تشکر! 🌾🚶‍♂️
 """
@@ -100,7 +97,7 @@ async def handle_restricted_user(update: Update, context: ContextTypes.DEFAULT_T
         msg = """
 ببین انگار اصلاً متوجه نیستی! 🤦‍♂️
 
-مگه نگفتم این ربات مال تو نیست؟ چرا دوباره داری پیام می‌فرستی؟ 
+مگه نگفتم این ربات مال تو نیست؟ چرا دوباره داری پیام می‌فرستی؟
 سواد خواندن و نوشتن نداری یا شاخات جلوی چشمت رو گرفته؟ 🐄🚫
 یک‌بار دیگه دست به این ربات بزنی با یه لحن دیگه باهات صحبت می‌کنم!
 """
@@ -120,6 +117,7 @@ async def handle_restricted_user(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(msg)
 
     return True
+
 
 
 # =====================================================
