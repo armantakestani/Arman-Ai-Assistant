@@ -4,7 +4,7 @@ from datetime import datetime
 
 from openai import AsyncOpenAI
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatAction
 from telegram.ext import (
     Application,
@@ -12,6 +12,7 @@ from telegram.ext import (
     MessageHandler,
     ContextTypes,
     filters,
+    CallbackQueryHandler
 )
 
 
@@ -59,14 +60,14 @@ logger = logging.getLogger(__name__)
 # آماده‌سازی اطلاعات کاربر برای ارسال به ادمین
 # =====================================================
 
-def format_user_info(user, message_text=None):
+def format_user_info(user, message_text=None, action_text="کاربر با بات کار کرد"):
     username = f"@{user.username}" if user.username else "ندارد"
     first_name = user.first_name or "ندارد"
     last_name = user.last_name or "ندارد"
     language_code = user.language_code or "نامشخص"
 
     text = f"""
-👤 کاربر با بات کار کرد
+👤 {action_text}
 
 🆔 Telegram ID: {user.id}
 👤 Username: {username}
@@ -79,23 +80,33 @@ def format_user_info(user, message_text=None):
     if message_text:
         text += f"""
 
-💬 پیام کاربر:
+💬 پیام / عملیات کاربر:
 {message_text}
 """
 
     return text
 
 
+
 # =====================================================
 # ارسال مشخصات کاربر به ادمین
 # =====================================================
 
-async def notify_admin(context: ContextTypes.DEFAULT_TYPE, user, message_text=None):
+async def notify_admin(
+    context: ContextTypes.DEFAULT_TYPE,
+    user,
+    message_text=None,
+    action_text="کاربر با بات کار کرد",
+):
     if not ADMIN_TELEGRAM_ID:
         logger.warning("ADMIN_TELEGRAM_ID is not set.")
         return
 
-    text = format_user_info(user, message_text)
+    text = format_user_info(
+        user=user,
+        message_text=message_text,
+        action_text=action_text,
+    )
 
     try:
         await context.bot.send_message(
@@ -104,6 +115,7 @@ async def notify_admin(context: ContextTypes.DEFAULT_TYPE, user, message_text=No
         )
     except Exception:
         logger.exception("Could not notify admin")
+
 
 
 # =====================================================
@@ -145,17 +157,82 @@ async def ask_gapgpt(user_message: str) -> str:
 # =====================================================
 
 async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    # به ادمین خبر می‌ده که کاربر صفحه تماس را باز کرده
+    await notify_admin(
+        context=context,
+        user=user,
+        message_text="/contact",
+        action_text="کاربر دستور /contact را زد",
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "📨 درخواست ارتباط با آرمان",
+                callback_data="contact_request",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "💬 پیام مستقیم در تلگرام",
+                url="https://t.me/armawni",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📸 اینستاگرام آرمان",
+                url="https://instagram.com/armawni",
+            )
+        ],
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
     contact_text = """
 📬 راه‌های ارتباطی با آرمان
+
+راه‌های مستقیم ارتباط:
 
 📞 Phone:
 09100379179
 
+💬 Telegram:
+@ArmanTakestani
+
 📸 Instagram:
-https://instagram.com/armawni
+@armawni
 """
 
-    await update.message.reply_text(contact_text)
+    await update.message.reply_text(
+        contact_text,
+        reply_markup=reply_markup,
+    )
+
+
+
+async def contact_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user = query.from_user
+
+    # جواب کوتاه به کلیک کاربر، تا حالت loading دکمه از بین برود
+    await query.answer("درخواست ارتباط ثبت شد ✅")
+
+    # پیام به خود کاربر
+    user_text = """
+✅ درخواست ارتباط شما ثبت شد.
+"""
+
+    await query.message.reply_text(user_text)
+
+    # پیام به ادمین
+    await notify_admin(
+        context=context,
+        user=user,
+        message_text="کاربر روی دکمه درخواست ارتباط کلیک کرد.",
+        action_text="درخواست ارتباط با آرمان",
+    )
 
 
 # =====================================================
@@ -263,11 +340,19 @@ def main():
     app.add_handler(CommandHandler("contact", contact))
 
     app.add_handler(
+        CallbackQueryHandler(
+            contact_button_handler,
+            pattern="^contact_request$",
+        )
+    )
+
+    app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             handle_message,
         )
     )
+
 
     app.add_error_handler(error_handler)
 
