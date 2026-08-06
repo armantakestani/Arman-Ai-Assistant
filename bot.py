@@ -205,7 +205,7 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 armantakestani6440@gmail.com
 
 💬 Telegram:
-@armawni
+@ArmanTakestani
 
 📸 Instagram:
 @armawni
