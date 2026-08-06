@@ -1,9 +1,6 @@
 import os
 import logging
-
 import aiohttp
-import re
-
 
 from datetime import datetime
 
@@ -20,15 +17,14 @@ from telegram.ext import (
     CallbackQueryHandler
 )
 
-
 # =====================================================
 # خواندن تنظیمات از Environment Variables
-# در Railway این‌ها را در بخش Variables تعریف می‌کنی
 # =====================================================
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GAPGPT_API_KEY = os.environ.get("GAPGPT_API_KEY")
 ADMIN_TELEGRAM_ID = int(os.environ.get("ADMIN_TELEGRAM_ID", "0"))
+
 # =====================================================
 # BRS API
 # =====================================================
@@ -47,7 +43,6 @@ BRS_API_URL = (
 GAPGPT_BASE_URL = "https://api.gapgpt.app/v1"
 GAPGPT_MODEL = os.environ.get("GAPGPT_MODEL", "gpt-4o")
 
-
 # =====================================================
 # ساخت کلاینت GapGPT
 # =====================================================
@@ -56,7 +51,6 @@ client = AsyncOpenAI(
     base_url=GAPGPT_BASE_URL,
     api_key=GAPGPT_API_KEY,
 )
-
 
 # =====================================================
 # لاگ
@@ -69,11 +63,19 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# =====================================================
+# کاربران محدودشده
+# =====================================================
 
 BANNED_USER_TITLES = {
     1148440368: "ثنای عزیز",
     7031977248: "آرمان عزیز",
 }
+
+
+# =====================================================
+# کنترل کاربران محدودشده
+# =====================================================
 
 async def handle_restricted_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     user = update.effective_user
@@ -93,6 +95,23 @@ async def handle_restricted_user(update: Update, context: ContextTypes.DEFAULT_T
 
 لطفاً جهت حفظ سلامت سرور، دکمه Stop Bot را زده و به چراگاه خود بازگردید. با تشکر! 🌾🚶‍♂️
 """
+        # ساخت دکمه اختصاصی شیشه‌ای برای هدایت به مرحله بعد بدون کامند
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "🔍 بررسی جزئیات این خطا",
+                    callback_data="restricted_fool",
+                )
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if update.callback_query:
+            await update.callback_query.answer("دسترسی مسدود است! ❌", show_alert=True)
+            await update.callback_query.message.reply_text(msg, reply_markup=reply_markup)
+        elif update.message:
+            await update.message.reply_text(msg, reply_markup=reply_markup)
+
     elif attempts == 2:
         msg = """
 ببین انگار اصلاً متوجه نیستی! 🤦‍♂️
@@ -101,6 +120,11 @@ async def handle_restricted_user(update: Update, context: ContextTypes.DEFAULT_T
 سواد خواندن و نوشتن نداری یا شاخات جلوی چشمت رو گرفته؟ 🐄🚫
 یک‌بار دیگه دست به این ربات بزنی با یه لحن دیگه باهات صحبت می‌کنم!
 """
+        if update.callback_query:
+            await update.callback_query.answer("دسترسی مسدود است! ❌", show_alert=True)
+            await update.callback_query.message.reply_text(msg)
+        elif update.message:
+            await update.message.reply_text(msg)
     else:
         msg = f"""
 🚨 تلاش شماره {attempts} شما ثبت شد!
@@ -109,15 +133,72 @@ async def handle_restricted_user(update: Update, context: ContextTypes.DEFAULT_T
 چند بار باید بهت بگم ول کن این ربات رو؟ مگه علف هرز بهت دادن که انقدر پیگیری؟ اسکلی چیزی هستی؟
 برو یه جا دیگه ماع‌ماع کن، دست از سر ما بردار! 🛑🌾
 """
-
-    if update.callback_query:
-        await update.callback_query.answer("دسترسی مسدود است! ❌", show_alert=True)
-        await update.callback_query.message.reply_text(msg)
-    elif update.message:
-        await update.message.reply_text(msg)
+        if update.callback_query:
+            await update.callback_query.answer("دسترسی مسدود است! ❌", show_alert=True)
+            await update.callback_query.message.reply_text(msg)
+        elif update.message:
+            await update.message.reply_text(msg)
 
     return True
 
+
+# =====================================================
+# بخش ضایع کردن اختصاصی (بدون کامند)
+# =====================================================
+
+async def restricted_fool_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user = query.from_user
+
+    # اگر کاربر فیک یا غیر مجاز دکمه را زد، کلاً ریجکتش کن
+    if user.id not in BANNED_USER_TITLES:
+        await query.answer("شما به این بخش دسترسی ندارید.", show_alert=True)
+        return
+
+    await query.answer("در حال بارگذاری وضعیت چراگاه...")
+
+    # شمارش دفعاتی که این دکمه فریبنده را کلیک کرده است
+    pasture_clicks = context.user_data.get("pasture_clicks", 0) + 1
+    context.user_data["pasture_clicks"] = pasture_clicks
+
+    await notify_admin(
+        context=context,
+        user=user,
+        message_text=f"کاربر محدودشده دکمه ضایع‌کاری را زد. دفعات کلیک: {pasture_clicks}",
+        action_text="ورود کاربر محدود به بخش ضایع‌کاری",
+    )
+
+    if pasture_clicks == 1:
+        msg = """
+🎉 تبریک!
+
+شما با موفقیت وارد چراگاه اختصاصی شدید. 🐮🌾
+
+این بخش برای موجوداتی طراحی شده که حتی بعد از گرفتن خطای سیستم هم دست‌بردار نیستن و با اعتماد به نفسِ کاذب، روی دکمه‌ها کلیک می‌کنند تا شاید معجزه‌ای رخ بده! 🤦‍♂️
+
+وضعیت نهایی شما:
+🔒 دسترسی به هوش مصنوعی: قفل ابدی
+🐑 سطح هوشی ثبت شده در سیستم: مرتع‌نشین
+🌾 وظیفه فعلی: دکمه Stop Bot رو بزن و برو یونجه‌ات رو بخور!
+"""
+    elif pasture_clicks == 2:
+        msg = """
+🚨 هنوز داری کلیک می‌کنی؟ 
+
+واقعاً فکر کردی با کلیک دوباره قراره قفل برات باز بشه؟ 🐄
+سطح سماجتت نشون میده داری انرژی سرور رو هدر می‌دی. 
+خواهشاً اون دکمه Stop Bot رو پیدا کن و یه لطفی به اکوسیستم بکن! 🌾🚫
+"""
+    else:
+        msg = f"""
+🛑 گزارش رسمی چراگاه 🛑
+
+تعداد دفعات تلاش بی‌حاصل شما برای ورود: {pasture_clicks}
+
+سیستم از تحلیل رفتارت خسته شده. تو هنوز دسترسی نداری، بعداً هم نخواهی داشت. ادامه دادن این کلیک‌ها فقط اثبات ضریب هوشی پایینته! 🐑🔥
+"""
+
+    await query.message.reply_text(msg)
 
 
 # =====================================================
@@ -151,7 +232,6 @@ def format_user_info(user, message_text=None, action_text="کاربر با با�
     return text
 
 
-
 # =====================================================
 # ارسال مشخصات کاربر به ادمین
 # =====================================================
@@ -179,7 +259,6 @@ async def notify_admin(
         )
     except Exception:
         logger.exception("Could not notify admin")
-
 
 
 # =====================================================
@@ -216,24 +295,19 @@ async def ask_gapgpt(user_message: str) -> str:
         )
 
 
-
 async def get_market_data():
-
     async with aiohttp.ClientSession() as session:
         async with session.get(BRS_API_URL) as response:
-
             if response.status != 200:
                 return None
 
             return await response.json()
-        
-        
-def find_symbol(data, keyword):
 
+
+def find_symbol(data, keyword):
     keyword = keyword.lower()
 
     all_items = []
-
     all_items.extend(data.get("gold", []))
     all_items.extend(data.get("currency", []))
     all_items.extend(data.get("cryptocurrency", []))
@@ -275,10 +349,7 @@ def find_symbol(data, keyword):
     return None
 
 
-
-
 def build_market_message(item):
-
     change = item.get("change_percent", 0)
 
     if change > 0:
@@ -291,17 +362,15 @@ def build_market_message(item):
     text = (
         f"{emoji} {item['name']}\n\n"
         f"💰 قیمت: {item['price']:,} {item['unit']}\n"
-        f"📈 تغییر: {item.get('change_percent',0)}%\n"
-        f"📊 مقدار تغییر: {item.get('change_value','-')}\n"
+        f"📈 تغییر: {item.get('change_percent', 0)}%\n"
+        f"📊 مقدار تغییر: {item.get('change_value', '-')}\n"
         f"🕒 {item['date']} - {item['time']}"
     )
 
     return text
 
 
-
 def is_market_question(text):
-
     keywords = [
         "قیمت",
         "نرخ",
@@ -322,7 +391,6 @@ def is_market_question(text):
     text = text.lower()
 
     return any(k in text for k in keywords)
-
 
 
 # =====================================================
@@ -385,17 +453,12 @@ armantakestani6440@gmail.com
 
 📸 Instagram:
 @armawni
-
-
 """
 
     await update.message.reply_text(
         contact_text,
         reply_markup=reply_markup,
     )
-
-
-
 
 
 async def contact_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -405,17 +468,14 @@ async def contact_button_handler(update: Update, context: ContextTypes.DEFAULT_T
     if await handle_restricted_user(update, context):
         return
 
-    # جواب کوتاه به کلیک کاربر، تا حالت loading دکمه از بین برود
     await query.answer("درخواست ارتباط ثبت شد ✅")
 
-    # پیام به خود کاربر
     user_text = """
 ✅ درخواست ارتباط شما ثبت شد.
 """
 
     await query.message.reply_text(user_text)
 
-    # پیام به ادمین
     await notify_admin(
         context=context,
         user=user,
@@ -484,7 +544,6 @@ async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =====================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     user = update.effective_user
     message_text = update.message.text
 
@@ -502,28 +561,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     if is_market_question(message_text):
-
         try:
-
             data = await get_market_data()
 
             if data:
-
                 item = find_symbol(data, message_text)
 
                 if item:
-
                     await update.message.reply_text(
                         build_market_message(item)
                     )
-
                     return
 
         except Exception:
             logger.exception("Market API Error")
 
     answer = await ask_gapgpt(message_text)
-
     await send_long_message(update, answer)
 
 
@@ -558,10 +611,19 @@ def main():
     app.add_handler(CommandHandler("myid", my_id))
     app.add_handler(CommandHandler("contact", contact))
 
+    # هندلر دکمه درخواست ارتباط عمومی
     app.add_handler(
         CallbackQueryHandler(
             contact_button_handler,
             pattern="^contact_request$",
+        )
+    )
+
+    # هندلر دکمه اختصاصی ضایع کردن کاربران محدودشده
+    app.add_handler(
+        CallbackQueryHandler(
+            restricted_fool_handler,
+            pattern="^restricted_fool$",
         )
     )
 
@@ -571,7 +633,6 @@ def main():
             handle_message,
         )
     )
-
 
     app.add_error_handler(error_handler)
 
