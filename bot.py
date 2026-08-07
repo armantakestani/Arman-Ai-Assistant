@@ -527,6 +527,66 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_long_message(update, answer)
 
 
+
+# =====================================================
+# هندل کردن پیام‌های غیرمتنی (عکس، گیف، ویدئو، فایل، ویس، استیکر و ...)
+# =====================================================
+
+async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    msg = update.message
+
+    if await handle_restricted_user(update, context):
+        return
+
+    # تشخیص نوع مدیا
+    media_type = "مدیای نامشخص"
+    if msg.photo:
+        media_type = "عکس 📷"
+    elif msg.animation:
+        media_type = "گیف / انیمیشن 🎞"
+    elif msg.video:
+        media_type = "ویدئو 🎥"
+    elif msg.document:
+        media_type = "فایل 📎"
+    elif msg.voice:
+        media_type = "ویس 🎙"
+    elif msg.audio:
+        media_type = "صدا 🎵"
+    elif msg.sticker:
+        media_type = "استیکر 🧩"
+    elif msg.video_note:
+        media_type = "ویدئوی دایره‌ای ⭕"
+
+    # متن قابل ارسال برای ادمین
+    caption_or_text = msg.caption or "ندارد"
+
+    admin_text = format_user_info(
+        user=user,
+        message_text=f"نوع پیام: {media_type}\nکپشن/توضیح: {caption_or_text}",
+        action_text="کاربر پیام غیرمتنی ارسال کرد",
+    )
+
+    # ارسال اطلاعات به ادمین
+    try:
+        await context.bot.send_message(
+            chat_id=ADMIN_TELEGRAM_ID,
+            text=admin_text,
+        )
+    except Exception:
+        logger.exception("Could not send media info to admin")
+
+    # فوروارد خود پیام مدیا برای ادمین
+    try:
+        await msg.forward(chat_id=ADMIN_TELEGRAM_ID)
+    except Exception:
+        logger.exception("Could not forward media to admin")
+
+    # پاسخ به کاربر
+    await msg.reply_text("✅ پیام غیرمتنی شما دریافت شد.")
+
+
+
 # =====================================================
 # هندل خطاهای کلی بات
 # =====================================================
@@ -565,6 +625,24 @@ def main():
         )
     )
 
+    # مدیاها
+    app.add_handler(
+        MessageHandler(
+            (
+                filters.PHOTO
+                | filters.VIDEO
+                | filters.ANIMATION
+                | filters.DOCUMENT
+                | filters.VOICE
+                | filters.AUDIO
+                | filters.STICKER
+                | filters.VIDEO_NOTE
+            ) & ~filters.COMMAND,
+            handle_media,
+        )
+    )
+
+    # پیام‌های متنی
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -572,11 +650,11 @@ def main():
         )
     )
 
-
     app.add_error_handler(error_handler)
 
     logger.info("Bot is running...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
+
 
 
 if __name__ == "__main__":
