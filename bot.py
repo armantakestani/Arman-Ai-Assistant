@@ -539,7 +539,6 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await handle_restricted_user(update, context):
         return
 
-    # تشخیص نوع مدیا
     media_type = "مدیای نامشخص"
     if msg.photo:
         media_type = "عکس 📷"
@@ -558,33 +557,21 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif msg.video_note:
         media_type = "ویدئوی دایره‌ای ⭕"
 
-    # متن قابل ارسال برای ادمین
     caption_or_text = msg.caption or "ندارد"
 
-    admin_text = format_user_info(
+    await notify_admin(
+        context=context,
         user=user,
         message_text=f"نوع پیام: {media_type}\nکپشن/توضیح: {caption_or_text}",
         action_text="کاربر پیام غیرمتنی ارسال کرد",
     )
 
-    # ارسال اطلاعات به ادمین
-    try:
-        await context.bot.send_message(
-            chat_id=ADMIN_TELEGRAM_ID,
-            text=admin_text,
-        )
-    except Exception:
-        logger.exception("Could not send media info to admin")
-
-    # فوروارد خود پیام مدیا برای ادمین
     try:
         await msg.forward(chat_id=ADMIN_TELEGRAM_ID)
     except Exception:
         logger.exception("Could not forward media to admin")
 
-    # پاسخ به کاربر
     await msg.reply_text("✅ پیام غیرمتنی شما دریافت شد.")
-
 
 
 # =====================================================
@@ -632,7 +619,7 @@ def main():
                 filters.PHOTO
                 | filters.VIDEO
                 | filters.ANIMATION
-                | filters.DOCUMENT
+                | filters.Document.ALL
                 | filters.VOICE
                 | filters.AUDIO
                 | filters.STICKER
@@ -654,7 +641,6 @@ def main():
 
     logger.info("Bot is running...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
-
 
 
 if __name__ == "__main__":
