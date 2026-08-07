@@ -527,53 +527,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_long_message(update, answer)
 
 
-
-# =====================================================
-# هندل کردن پیام‌های غیرمتنی (عکس، گیف، ویدئو، فایل، ویس، استیکر و ...)
-# =====================================================
-
-async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    msg = update.message
-
-    if await handle_restricted_user(update, context):
-        return
-
-    media_type = "مدیای نامشخص"
-    if msg.photo:
-        media_type = "عکس 📷"
-    elif msg.animation:
-        media_type = "گیف / انیمیشن 🎞"
-    elif msg.video:
-        media_type = "ویدئو 🎥"
-    elif msg.document:
-        media_type = "فایل 📎"
-    elif msg.voice:
-        media_type = "ویس 🎙"
-    elif msg.audio:
-        media_type = "صدا 🎵"
-    elif msg.sticker:
-        media_type = "استیکر 🧩"
-    elif msg.video_note:
-        media_type = "ویدئوی دایره‌ای ⭕"
-
-    caption_or_text = msg.caption or "ندارد"
-
-    await notify_admin(
-        context=context,
-        user=user,
-        message_text=f"نوع پیام: {media_type}\nکپشن/توضیح: {caption_or_text}",
-        action_text="کاربر پیام غیرمتنی ارسال کرد",
-    )
-
-    try:
-        await msg.forward(chat_id=ADMIN_TELEGRAM_ID)
-    except Exception:
-        logger.exception("Could not forward media to admin")
-
-    await msg.reply_text("✅ پیام غیرمتنی شما دریافت شد.")
-
-
 # =====================================================
 # هندل خطاهای کلی بات
 # =====================================================
@@ -612,30 +565,13 @@ def main():
         )
     )
 
-    # مدیاها
-    app.add_handler(
-        MessageHandler(
-            (
-                filters.PHOTO
-                | filters.VIDEO
-                | filters.ANIMATION
-                | filters.Document.ALL
-                | filters.VOICE
-                | filters.AUDIO
-                | filters.STICKER
-                | filters.VIDEO_NOTE
-            ) & ~filters.COMMAND,
-            handle_media,
-        )
-    )
-
-    # پیام‌های متنی
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             handle_message,
         )
     )
+
 
     app.add_error_handler(error_handler)
 
