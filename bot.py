@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 
 BANNED_USER_TITLES = {
    # 1148440368: "ثنای عزیز",
-    7031977248: "آرمان عزیز",
+    7031977278: "آرمان عزیز",
 }
 
 async def handle_restricted_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
