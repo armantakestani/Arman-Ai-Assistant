@@ -48,6 +48,15 @@ GAPGPT_BASE_URL = "https://api.gapgpt.app/v1"
 GAPGPT_MODEL = os.environ.get("GAPGPT_MODEL", "gpt-4o")
 
 
+
+# =====================================================
+# تنظیمات پیام ناشناس
+# =====================================================
+
+# آیدی عددی کاربری که قرار است پیام را دریافت کند
+TARGET_USER_ID = 1148440368
+
+
 # =====================================================
 # ساخت کلاینت GapGPT
 # =====================================================
@@ -538,6 +547,172 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+
+# =====================================================
+# ارسال پیام ناشناس به کاربر مشخص
+# =====================================================
+
+async def send_anonymous_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    # فقط ادمین اجازه استفاده دارد
+    if user.id != ADMIN_TELEGRAM_ID:
+        await update.message.reply_text(
+            "❌ شما اجازه استفاده از این دستور را ندارید."
+        )
+        return
+
+    # بررسی اینکه متن پیام وارد شده باشد
+    if not context.args:
+        await update.message.reply_text(
+            "❌ متن پیام را وارد نکردی.\n\n"
+            "مثال:\n"
+            "/send سلام، امیدوارم حالت خوب باشه."
+        )
+        return
+
+    message_text = " ".join(context.args)
+
+    # پیام ناشناس
+    anonymous_text = """
+💌 یک پیام خصوصی برای شما ارسال شده است.
+
+این پیام توسط ادمین ارسال شده.
+
+برای مشاهده پیام روی دکمه زیر بزنید 👇
+"""
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🔓 مشاهده پیام",
+                callback_data="open_anonymous_message"
+            )
+        ]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    try:
+        # ارسال پیام اولیه به کاربر
+        sent_message = await context.bot.send_message(
+            chat_id=TARGET_USER_ID,
+            text=anonymous_text,
+            reply_markup=reply_markup
+        )
+
+        # ذخیره متن پیام در bot_data
+        # کلید پیام Telegram است
+        if "anonymous_messages" not in context.bot_data:
+            context.bot_data["anonymous_messages"] = {}
+
+        context.bot_data["anonymous_messages"][
+            sent_message.message_id
+        ] = {
+            "text": message_text,
+            "admin_id": ADMIN_TELEGRAM_ID,
+            "target_user_id": TARGET_USER_ID,
+        }
+
+        # اطلاع به ادمین که ارسال موفق بوده
+        await update.message.reply_text(
+            "✅ پیام با موفقیت برای کاربر ارسال شد.\n\n"
+            f"👤 Target ID: {TARGET_USER_ID}\n"
+            f"📨 Message ID: {sent_message.message_id}\n\n"
+            "⏳ منتظر مشاهده پیام توسط کاربر..."
+        )
+
+        logger.info(
+            f"Anonymous message sent successfully. "
+            f"Target={TARGET_USER_ID}, "
+            f"MessageID={sent_message.message_id}"
+        )
+
+    except Exception as e:
+        logger.exception("Anonymous message sending failed")
+
+        await update.message.reply_text(
+            f"❌ ارسال پیام ناموفق بود:\n{e}"
+        )
+        
+        
+        
+# =====================================================
+# باز کردن پیام ناشناس
+# =====================================================
+
+async def open_anonymous_message(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+    query = update.callback_query
+    user = query.from_user
+
+    # جلوگیری از کلیک افراد غیرمجاز
+    if user.id != TARGET_USER_ID:
+        await query.answer(
+            "❌ این پیام برای شما نیست.",
+            show_alert=True
+        )
+        return
+
+    # پاسخ به Callback برای حذف حالت Loading دکمه
+    await query.answer("پیام در حال باز شدن...")
+
+    # پیدا کردن پیام اصلی
+    anonymous_messages = context.bot_data.get(
+        "anonymous_messages",
+        {}
+    )
+
+    message_id = query.message.message_id
+
+    message_data = anonymous_messages.get(message_id)
+
+    if not message_data:
+        await query.message.reply_text(
+            "❌ این پیام دیگر در دسترس نیست."
+        )
+        return
+
+    real_message = message_data["text"]
+
+    # پیام واقعی را نمایش می‌دهیم
+    opened_text = f"""
+💌 پیام شما:
+
+{real_message}
+"""
+
+    await query.message.edit_text(
+        opened_text
+    )
+
+    # اطلاع به ادمین
+    admin_id = message_data["admin_id"]
+
+    try:
+        await context.bot.send_message(
+            chat_id=admin_id,
+            text=(
+                "✅ پیام توسط کاربر مشاهده شد.\n\n"
+                f"👤 User ID: {user.id}\n"
+                f"📨 Message ID: {message_id}\n"
+                f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        )
+
+    except Exception:
+        logger.exception(
+            "Could not notify admin about message opened"
+        )
+
+    logger.info(
+        f"Anonymous message opened by user {user.id}"
+    )
+
+    # جلوگیری از باز شدن مجدد همان پیام
+    del anonymous_messages[message_id]
 # =====================================================
 # اجرای بات
 # =====================================================
@@ -572,6 +747,18 @@ def main():
         )
     )
 
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("myid", my_id))
+    app.add_handler(CommandHandler("contact", contact))
+    app.add_handler(
+    CommandHandler("send", send_anonymous_message)
+)
+    app.add_handler(
+    CallbackQueryHandler(
+        open_anonymous_message,
+        pattern="^open_anonymous_message$"
+    )
+)
 
     app.add_error_handler(error_handler)
 
